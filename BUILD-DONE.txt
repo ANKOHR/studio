@@ -1,0 +1,4 @@
+Tests: 11 passed
+Local commit hash: 1a732d9c8ffa9bc39d8ccf9a1fe660d0591725df
+
+Built Studio, a deterministic CPU-only Python CLI that generates fictional brand tokens and a complete token-driven launch package. The package includes SVG identity assets and diagrams, responsive HTML for the landing page, product screens, and a ten-slide deck, plus Markdown launch copy, ads, social assets, a video storyboard, campaign plan, and brand guide. Structured reasoning records track creative choices, rebuilds synchronize token edits with the reasoning log, and the consistency checker validates palette, typography, labels, traceability, and voice. The generated ZIP contains 21 checked artifacts and a manifest.
