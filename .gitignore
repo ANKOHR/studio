@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+st-codex.log
+st-launch.py
+st-prompt.txt
+brands/
+*.zip
+
