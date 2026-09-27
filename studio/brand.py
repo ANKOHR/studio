@@ -188,6 +188,40 @@ def validate_reasoning(reasoning: dict[str, Any]) -> list[str]:
     return issues
 
 
+def synchronize_reasoning(tokens: dict[str, Any], reasoning: dict[str, Any]) -> bool:
+    """Record token-driven choice changes while retaining their prior rationale."""
+    by_id = {record["id"]: record for record in reasoning["decisions"] if isinstance(record, dict) and isinstance(record.get("id"), str)}
+    choices = {
+        "company_name": tokens["company"]["name"],
+        "positioning": tokens["company"]["positioning"],
+        "messaging": [pillar["title"] for pillar in tokens["messaging_pillars"]],
+        "visual_identity": tokens["palette"]["primary"],
+        "product_story": [screen["title"] for screen in tokens["product"]["screens"]],
+        "launch_narrative": tokens["company"]["tagline"],
+    }
+    changed = False
+    for decision_id, selected in choices.items():
+        record = by_id[decision_id]
+        previous = record["chosen_option"]
+        if previous == selected:
+            continue
+        record.setdefault("previous_choices", []).append({
+            "chosen_option": previous,
+            "rationale": record["rationale"],
+            "basis": record["basis"],
+        })
+        options = record.setdefault("options_considered", [])
+        if selected not in options:
+            options.append(selected)
+        record["chosen_option"] = selected
+        old_text = json.dumps(previous, ensure_ascii=False, sort_keys=True)
+        new_text = json.dumps(selected, ensure_ascii=False, sort_keys=True)
+        record["rationale"] = f"A token edit changed the selected value from {old_text} to {new_text}. This rebuild follows the token file. The rationale is an assumption."
+        record["basis"] = "assumption"
+        changed = True
+    return changed
+
+
 def write_brand(out_dir: Path, seed: int) -> tuple[Path, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     tokens, reasoning = generate_brand(seed)
@@ -209,4 +243,3 @@ def load_brand(brand_dir: Path) -> tuple[dict[str, Any], dict[str, Any], bytes]:
     if tokens.get("schema_version") != TOKEN_VERSION:
         raise ValueError(f"unsupported token schema: {tokens.get('schema_version')}")
     return tokens, reasoning, token_bytes
-

@@ -10,7 +10,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-from .brand import REQUIRED_DECISIONS, load_brand, validate_reasoning
+from .brand import REQUIRED_DECISIONS, load_brand, synchronize_reasoning, validate_reasoning
 from .render import generate_artifacts
 
 
@@ -50,6 +50,19 @@ def _reasoning_by_id(reasoning: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {record["id"]: record for record in reasoning["decisions"] if isinstance(record, dict) and isinstance(record.get("id"), str)}
 
 
+def _reasoning_token_issues(tokens: dict[str, Any], reasoning: dict[str, Any]) -> list[str]:
+    by_id = _reasoning_by_id(reasoning)
+    expected = {
+        "company_name": tokens["company"]["name"],
+        "positioning": tokens["company"]["positioning"],
+        "messaging": [pillar["title"] for pillar in tokens["messaging_pillars"]],
+        "visual_identity": tokens["palette"]["primary"],
+        "product_story": [screen["title"] for screen in tokens["product"]["screens"]],
+        "launch_narrative": tokens["company"]["tagline"],
+    }
+    return [f"reasoning choice does not match token value: {decision_id}" for decision_id, choice in expected.items() if by_id.get(decision_id, {}).get("chosen_option") != choice]
+
+
 def _prepare_output(output_dir: Path) -> None:
     if not output_dir.exists():
         output_dir.mkdir(parents=True)
@@ -85,6 +98,12 @@ def build_package(brand_dir: Path, output_dir: Path | None = None) -> tuple[Path
     reasoning_issues = validate_reasoning(reasoning)
     if reasoning_issues:
         raise ValueError("incomplete reasoning log: " + "; ".join(reasoning_issues))
+    if synchronize_reasoning(tokens, reasoning):
+        reasoning_issues = validate_reasoning(reasoning)
+        if reasoning_issues:
+            raise ValueError("incomplete reasoning log after token update: " + "; ".join(reasoning_issues))
+        reasoning_path = brand_dir / "reasoning.json"
+        reasoning_path.write_text(json.dumps(reasoning, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     out = (output_dir or (brand_dir / "launch")).resolve()
     if out == brand_dir or brand_dir in out.parents:
         if out == brand_dir:
@@ -130,6 +149,7 @@ def check_package(brand_dir: Path, output_dir: Path | None = None) -> dict[str, 
     issues: list[str] = []
     issues.extend(_validate_tokens(tokens))
     issues.extend(validate_reasoning(reasoning))
+    issues.extend(_reasoning_token_issues(tokens, reasoning))
     manifest_path = out / "manifest.json"
     if not manifest_path.is_file():
         return {"ok": False, "issues": [*issues, f"missing build manifest: {manifest_path}"]}
